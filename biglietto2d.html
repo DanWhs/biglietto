@@ -1,0 +1,1592 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#080808" />
+  <meta name="description" content="Biglietto da visita digitale 2D con liquid glass e repository GitHub." />
+  <title>Daniele — Digital Card</title>
+
+  <style>
+    :root{
+      --bg:#080808;
+      --paper:#f4f4f1;
+      --ink:#0b0b0b;
+      --white:#ffffff;
+      --muted:rgba(255,255,255,.52);
+
+      --card-width:1120px;
+      --card-min-height:620px;
+      --card-radius:36px;
+      --card-padding:42px;
+
+      --panel-width:410px;
+      --panel-repos-width:610px;
+      --panel-radius:28px;
+
+      --name-size:clamp(56px,8.2vw,132px);
+      --surname-size:clamp(42px,6vw,92px);
+      --role-size:13px;
+      --link-size:clamp(19px,2.1vw,30px);
+      --body-size:14px;
+      --micro-size:10px;
+
+      --safe-top:max(18px,env(safe-area-inset-top));
+      --safe-bottom:max(18px,env(safe-area-inset-bottom));
+
+      --mx:50%;
+      --my:35%;
+      --glass-x:0px;
+      --glass-y:0px;
+    }
+
+    *{box-sizing:border-box}
+
+    html,body{
+      width:100%;
+      min-height:100%;
+      margin:0;
+      background:var(--bg);
+      color:#fff;
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Arial,sans-serif;
+      -webkit-font-smoothing:antialiased;
+      text-rendering:optimizeLegibility;
+    }
+
+    body{
+      min-height:100dvh;
+      overflow-x:hidden;
+    }
+
+    button,a{font:inherit}
+    button{color:inherit}
+
+    .scene{
+      position:relative;
+      min-height:100dvh;
+      padding:
+        calc(var(--safe-top) + 28px)
+        clamp(10px,4vw,56px)
+        calc(var(--safe-bottom) + 28px);
+      display:grid;
+      place-items:center;
+      overflow:hidden;
+      isolation:isolate;
+    }
+
+    /* ==========================================================
+       SFONDO MONOCROMATICO
+       ========================================================== */
+    .background{
+      position:fixed;
+      inset:-20%;
+      z-index:-5;
+      overflow:hidden;
+      background:#070707;
+      pointer-events:none;
+    }
+
+    .pattern{
+      position:absolute;
+      inset:-18%;
+      filter:blur(76px) saturate(0%);
+      opacity:.86;
+      mix-blend-mode:screen;
+      will-change:transform;
+    }
+
+    .pattern.a{
+      background:
+        repeating-radial-gradient(
+          ellipse at 22% 36%,
+          rgba(255,255,255,.31) 0 4%,
+          rgba(255,255,255,.04) 5% 9%,
+          transparent 10% 16%
+        ),
+        conic-gradient(
+          from 35deg at 62% 46%,
+          transparent 0 15%,
+          rgba(255,255,255,.18) 21% 34%,
+          transparent 40% 61%,
+          rgba(128,128,128,.16) 69% 80%,
+          transparent 88%
+        );
+      animation:driftA 22s cubic-bezier(.4,0,.2,1) infinite alternate;
+    }
+
+    .pattern.b{
+      inset:-34%;
+      opacity:.64;
+      background:
+        repeating-conic-gradient(
+          from 25deg at 68% 64%,
+          rgba(255,255,255,.15) 0 10deg,
+          transparent 12deg 30deg,
+          rgba(125,125,125,.13) 33deg 42deg,
+          transparent 45deg 70deg
+        );
+      animation:driftB 28s cubic-bezier(.4,0,.2,1) infinite alternate;
+    }
+
+    .pattern.c{
+      inset:-25%;
+      opacity:.48;
+      background:
+        repeating-radial-gradient(
+          circle at 70% 24%,
+          rgba(255,255,255,.14) 0 3%,
+          rgba(90,90,90,.08) 4% 8%,
+          transparent 9% 14%
+        );
+      animation:driftC 26s ease-in-out infinite alternate;
+    }
+
+    .background::after{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:
+        linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px),
+        radial-gradient(circle at center,transparent 32%,rgba(0,0,0,.42) 76%,rgba(0,0,0,.78) 100%);
+      background-size:38px 38px,38px 38px,100% 100%;
+    }
+
+    @keyframes driftA{
+      from{transform:translate3d(-5%,-4%,0) rotate(-8deg) scale(1.08)}
+      to{transform:translate3d(8%,7%,0) rotate(14deg) scale(1.26)}
+    }
+
+    @keyframes driftB{
+      from{transform:translate3d(8%,-7%,0) rotate(11deg) scale(1.1)}
+      to{transform:translate3d(-8%,9%,0) rotate(-18deg) scale(1.28)}
+    }
+
+    @keyframes driftC{
+      from{transform:translate3d(-4%,8%,0) rotate(-5deg) scale(1.04)}
+      to{transform:translate3d(9%,-7%,0) rotate(10deg) scale(1.22)}
+    }
+
+    .grain,.vignette,.pointer-glow{
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+    }
+
+    .grain{
+      z-index:50;
+      opacity:.033;
+      mix-blend-mode:soft-light;
+      background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.92' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    .vignette{
+      z-index:49;
+      background:radial-gradient(circle at center,transparent 45%,rgba(0,0,0,.62) 125%);
+    }
+
+    .pointer-glow{
+      z-index:-1;
+      width:420px;
+      height:420px;
+      inset:auto;
+      left:var(--pointer-x,50%);
+      top:var(--pointer-y,50%);
+      transform:translate(-50%,-50%);
+      border-radius:50%;
+      background:
+        radial-gradient(circle,rgba(255,255,255,.13),rgba(255,255,255,.035) 34%,transparent 70%);
+      filter:blur(22px);
+      opacity:.74;
+    }
+
+    /* ==========================================================
+       CARD + RIFRAZIONE LIQUID GLASS
+       ========================================================== */
+    .card-shell{
+      width:min(var(--card-width),100%);
+      min-height:var(--card-min-height);
+      position:relative;
+      z-index:2;
+      perspective:1300px;
+    }
+
+    .card{
+      position:relative;
+      min-height:inherit;
+      overflow:hidden;
+      border-radius:var(--card-radius);
+      padding:var(--card-padding);
+      display:grid;
+      grid-template-columns:minmax(0,1.2fr) minmax(300px,.8fr);
+      gap:clamp(34px,6vw,86px);
+
+      border:1px solid rgba(255,255,255,.23);
+      background:
+        linear-gradient(135deg,rgba(255,255,255,.105),rgba(255,255,255,.026) 42%,rgba(255,255,255,.065)),
+        rgba(15,15,15,.48);
+
+      backdrop-filter:
+        blur(38px)
+        saturate(0%)
+        contrast(1.12)
+        brightness(1.06);
+      -webkit-backdrop-filter:
+        blur(38px)
+        saturate(0%)
+        contrast(1.12)
+        brightness(1.06);
+
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.27),
+        inset 1px 0 0 rgba(255,255,255,.08),
+        inset -1px 0 0 rgba(0,0,0,.2),
+        inset 0 -1px 0 rgba(0,0,0,.32),
+        0 44px 130px rgba(0,0,0,.52);
+
+      transform:
+        rotateX(var(--rx,0deg))
+        rotateY(var(--ry,0deg))
+        translateZ(0);
+      transform-style:preserve-3d;
+      transition:transform .18s ease-out,box-shadow .35s ease;
+      will-change:transform;
+    }
+
+    /* Pattern duplicato e deformato dentro il vetro:
+       dà una sensazione di rifrazione reale, non solo blur. */
+    .refracted-pattern{
+      position:absolute;
+      inset:-18%;
+      z-index:0;
+      pointer-events:none;
+      opacity:.42;
+      background:
+        repeating-radial-gradient(
+          ellipse at 26% 38%,
+          rgba(255,255,255,.31) 0 4%,
+          rgba(255,255,255,.04) 5% 9%,
+          transparent 10% 16%
+        ),
+        repeating-conic-gradient(
+          from 20deg at 68% 62%,
+          rgba(255,255,255,.13) 0 9deg,
+          transparent 12deg 28deg,
+          rgba(120,120,120,.11) 31deg 42deg,
+          transparent 45deg 70deg
+        );
+      filter:url(#liquid-distortion) blur(15px) contrast(1.16);
+      transform:
+        translate3d(var(--glass-x),var(--glass-y),0)
+        scale(1.12);
+      mix-blend-mode:screen;
+      animation:glassDrift 18s ease-in-out infinite alternate;
+      will-change:transform;
+    }
+
+    @keyframes glassDrift{
+      from{
+        transform:
+          translate3d(calc(var(--glass-x) - 2%),calc(var(--glass-y) - 2%),0)
+          rotate(-3deg)
+          scale(1.11)
+      }
+      to{
+        transform:
+          translate3d(calc(var(--glass-x) + 3%),calc(var(--glass-y) + 3%),0)
+          rotate(4deg)
+          scale(1.2)
+      }
+    }
+
+    /* Specular highlight che segue il puntatore. */
+    .glass-specular{
+      position:absolute;
+      inset:0;
+      z-index:1;
+      pointer-events:none;
+      background:
+        radial-gradient(
+          circle 260px at var(--mx) var(--my),
+          rgba(255,255,255,.24),
+          rgba(255,255,255,.08) 24%,
+          transparent 62%
+        ),
+        linear-gradient(
+          115deg,
+          transparent 17%,
+          rgba(255,255,255,.13) 34%,
+          transparent 52%
+        );
+      mix-blend-mode:screen;
+      opacity:.72;
+    }
+
+    .glass-edge{
+      position:absolute;
+      inset:1px;
+      z-index:2;
+      pointer-events:none;
+      border-radius:calc(var(--card-radius) - 1px);
+      box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,.08),
+        inset 0 13px 28px rgba(255,255,255,.035),
+        inset 0 -18px 30px rgba(0,0,0,.22);
+      mask-image:linear-gradient(145deg,#000,rgba(0,0,0,.72) 48%,#000);
+    }
+
+    .card::after{
+      content:"";
+      position:absolute;
+      z-index:2;
+      width:260px;
+      height:260px;
+      right:-82px;
+      bottom:-116px;
+      border-radius:50%;
+      border:1px solid rgba(255,255,255,.16);
+      box-shadow:
+        0 0 0 28px rgba(255,255,255,.027),
+        0 0 0 62px rgba(255,255,255,.018);
+      animation:ringPulse 7s ease-in-out infinite;
+      pointer-events:none;
+    }
+
+    @keyframes ringPulse{
+      50%{transform:scale(1.08);opacity:.46}
+    }
+
+    .card-main,.card-side{
+      position:relative;
+      z-index:4;
+      min-width:0;
+    }
+
+    .card-main{
+      display:flex;
+      flex-direction:column;
+      justify-content:space-between;
+    }
+
+    .topline{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:18px;
+      margin-bottom:clamp(52px,9vw,100px);
+    }
+
+    .micro{
+      font-size:var(--micro-size);
+      letter-spacing:.16em;
+      text-transform:uppercase;
+      color:rgba(255,255,255,.5);
+    }
+
+    .availability{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+    }
+
+    .availability-dot{
+      width:6px;
+      height:6px;
+      border-radius:50%;
+      background:#fff;
+      box-shadow:0 0 16px rgba(255,255,255,.72);
+      animation:pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse{
+      50%{opacity:.35;transform:scale(.72)}
+    }
+
+    .identity{
+      margin-bottom:clamp(48px,8vw,88px);
+    }
+
+    .name-line{
+      position:relative;
+      display:block;
+      width:max-content;
+      max-width:100%;
+      line-height:.76;
+      font-size:var(--name-size);
+      letter-spacing:-.085em;
+      font-weight:760;
+      text-transform:uppercase;
+      white-space:nowrap;
+    }
+
+    .name-line::after{
+      content:attr(data-ghost);
+      position:absolute;
+      inset:0;
+      transform:translate(5px,7px);
+      color:transparent;
+      -webkit-text-stroke:1px rgba(255,255,255,.18);
+      filter:blur(.35px);
+      z-index:-1;
+    }
+
+    .surname-line{
+      position:relative;
+      display:block;
+      margin-top:.26em;
+      width:max-content;
+      max-width:100%;
+      line-height:.86;
+      font-size:var(--surname-size);
+      letter-spacing:-.068em;
+      font-weight:370;
+      text-transform:uppercase;
+      color:rgba(255,255,255,.8);
+      white-space:nowrap;
+    }
+
+    .surname-line .tight{
+      letter-spacing:-.15em;
+      font-weight:620;
+    }
+
+    .surname-line::before{
+      content:attr(data-ghost);
+      position:absolute;
+      left:4px;
+      top:5px;
+      color:rgba(255,255,255,.052);
+      filter:blur(4px);
+      z-index:-1;
+    }
+
+    .role{
+      margin-top:28px;
+      max-width:46ch;
+      color:rgba(255,255,255,.62);
+      font-size:var(--role-size);
+      line-height:1.7;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+
+    .footer-row{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:20px;
+      color:rgba(255,255,255,.44);
+      font-size:var(--micro-size);
+      letter-spacing:.14em;
+      text-transform:uppercase;
+    }
+
+    .scrolling-code{
+      max-width:260px;
+      overflow:hidden;
+      white-space:nowrap;
+      mask-image:linear-gradient(90deg,transparent,black 14%,black 86%,transparent);
+    }
+
+    .scrolling-code span{
+      display:inline-block;
+      padding-left:100%;
+      animation:marquee 14s linear infinite;
+    }
+
+    @keyframes marquee{
+      to{transform:translateX(-100%)}
+    }
+
+    /* ==========================================================
+       LINK ISPIRATI AL BIGLIETTO 3D
+       ========================================================== */
+    .card-side{
+      display:flex;
+      flex-direction:column;
+      justify-content:space-between;
+      padding-left:clamp(0px,2vw,24px);
+      border-left:1px solid rgba(255,255,255,.11);
+    }
+
+    .side-heading{
+      color:rgba(255,255,255,.44);
+      font-size:var(--micro-size);
+      letter-spacing:.16em;
+      text-transform:uppercase;
+      margin-bottom:24px;
+    }
+
+    .link-list{
+      display:grid;
+      gap:3px;
+    }
+
+    .link-item{
+      position:relative;
+      width:100%;
+      padding:14px 0 17px;
+      border:0;
+      border-bottom:1px solid rgba(255,255,255,.11);
+      background:transparent;
+      color:rgba(255,255,255,.76);
+      display:grid;
+      grid-template-columns:minmax(0,1fr) auto;
+      align-items:center;
+      gap:18px;
+      text-align:left;
+      cursor:pointer;
+      transition:
+        color .22s,
+        padding .22s,
+        filter .22s;
+    }
+
+    .link-copy{
+      min-width:0;
+      display:grid;
+      gap:3px;
+    }
+
+    .link-name{
+      display:block;
+      font-size:var(--link-size);
+      line-height:1;
+      font-weight:440;
+      letter-spacing:-.048em;
+      transition:
+        font-weight .22s,
+        letter-spacing .22s;
+    }
+
+    .link-handle{
+      display:block;
+      color:rgba(255,255,255,.36);
+      font-size:9px;
+      font-weight:560;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      transition:color .22s;
+    }
+
+    .link-item::after{
+      content:"";
+      position:absolute;
+      left:0;
+      bottom:9px;
+      width:0;
+      height:1px;
+      background:
+        repeating-linear-gradient(
+          90deg,
+          rgba(255,255,255,.94) 0 6px,
+          transparent 6px 11px
+        );
+      transition:width .35s cubic-bezier(.2,.75,.2,1);
+    }
+
+    .link-item:hover,
+    .link-item:focus-visible,
+    .link-item.active{
+      color:#fff;
+      padding-left:8px;
+      outline:none;
+    }
+
+    .link-item:hover .link-name,
+    .link-item:focus-visible .link-name,
+    .link-item.active .link-name{
+      font-weight:760;
+      letter-spacing:-.078em;
+    }
+
+    .link-item:hover .link-handle,
+    .link-item:focus-visible .link-handle,
+    .link-item.active .link-handle{
+      color:rgba(255,255,255,.62);
+    }
+
+    .link-item:hover::after,
+    .link-item:focus-visible::after,
+    .link-item.active::after{
+      width:min(74%,290px);
+    }
+
+    .link-arrow{
+      font-size:calc(var(--link-size) * .88);
+      font-weight:400;
+      transition:transform .22s,filter .22s;
+    }
+
+    .link-item:hover .link-arrow,
+    .link-item:focus-visible .link-arrow,
+    .link-item.active .link-arrow{
+      transform:translate(5px,-5px);
+      filter:drop-shadow(0 0 10px rgba(255,255,255,.34));
+    }
+
+    .side-meta{
+      margin-top:44px;
+      display:flex;
+      justify-content:space-between;
+      gap:18px;
+      color:rgba(255,255,255,.4);
+      font-size:var(--micro-size);
+      text-transform:uppercase;
+      letter-spacing:.13em;
+    }
+
+    .orb{
+      position:absolute;
+      z-index:5;
+      width:78px;
+      height:78px;
+      left:var(--orb-x,74%);
+      top:var(--orb-y,20%);
+      transform:translate(-50%,-50%);
+      border-radius:50%;
+      border:1px solid rgba(255,255,255,.22);
+      background:
+        radial-gradient(circle at 34% 28%,rgba(255,255,255,.46),rgba(255,255,255,.09) 30%,rgba(0,0,0,.08) 68%),
+        rgba(255,255,255,.035);
+      backdrop-filter:blur(18px) contrast(1.1);
+      -webkit-backdrop-filter:blur(18px) contrast(1.1);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.3),
+        inset -8px -10px 22px rgba(0,0,0,.22),
+        0 18px 42px rgba(0,0,0,.32);
+      pointer-events:none;
+      transition:left .3s ease,top .3s ease;
+    }
+
+    /* ==========================================================
+       PANEL DETTAGLI / REPOSITORY
+       ========================================================== */
+    .detail-panel{
+      position:fixed;
+      z-index:30;
+      top:50%;
+      right:24px;
+      width:min(var(--panel-width),calc(100vw - 48px));
+      max-height:min(82vh,760px);
+      transform:translate(calc(100% + 60px),-50%);
+      opacity:0;
+      pointer-events:none;
+      overflow:hidden;
+      border-radius:var(--panel-radius);
+      border:1px solid rgba(255,255,255,.16);
+      background:
+        radial-gradient(circle at 10% 0%,rgba(255,255,255,.14),transparent 34%),
+        linear-gradient(145deg,rgba(255,255,255,.105),rgba(255,255,255,.022)),
+        rgba(14,14,14,.68);
+      backdrop-filter:
+        blur(38px)
+        saturate(0%)
+        contrast(1.1);
+      -webkit-backdrop-filter:
+        blur(38px)
+        saturate(0%)
+        contrast(1.1);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.16),
+        0 38px 120px rgba(0,0,0,.62);
+      transition:
+        width .45s cubic-bezier(.16,1,.3,1),
+        transform .7s cubic-bezier(.16,1,.3,1),
+        opacity .45s ease,
+        filter .45s ease;
+      filter:blur(18px);
+    }
+
+    .detail-panel.repos-mode{
+      width:min(var(--panel-repos-width),calc(100vw - 48px));
+    }
+
+    .detail-panel.open{
+      transform:translate(0,-50%);
+      opacity:1;
+      pointer-events:auto;
+      filter:blur(0);
+    }
+
+    .panel-inner{
+      position:relative;
+      max-height:inherit;
+      padding:26px;
+      display:flex;
+      flex-direction:column;
+      overflow:auto;
+      overscroll-behavior:contain;
+    }
+
+    .panel-close{
+      position:absolute;
+      z-index:2;
+      top:16px;
+      right:16px;
+      width:38px;
+      height:38px;
+      display:grid;
+      place-items:center;
+      border-radius:50%;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.04);
+      color:white;
+      cursor:pointer;
+    }
+
+    .panel-index{
+      color:rgba(255,255,255,.42);
+      font-size:var(--micro-size);
+      letter-spacing:.16em;
+      margin-bottom:52px;
+    }
+
+    .panel-eyebrow{
+      color:rgba(255,255,255,.45);
+      font-size:var(--micro-size);
+      letter-spacing:.16em;
+      text-transform:uppercase;
+      margin-bottom:10px;
+    }
+
+    .panel-title{
+      margin:0;
+      font-size:clamp(38px,5vw,58px);
+      line-height:.95;
+      letter-spacing:-.07em;
+      font-weight:720;
+    }
+
+    .panel-description{
+      margin:20px 0 24px;
+      max-width:40ch;
+      color:rgba(255,255,255,.6);
+      font-size:var(--body-size);
+      line-height:1.68;
+    }
+
+    .tags{
+      display:flex;
+      flex-wrap:wrap;
+      gap:7px;
+      margin-bottom:28px;
+    }
+
+    .tag{
+      padding:7px 10px;
+      border:1px solid rgba(255,255,255,.09);
+      border-radius:999px;
+      color:rgba(255,255,255,.44);
+      font-size:8px;
+      text-transform:uppercase;
+      letter-spacing:.11em;
+    }
+
+    .repo-section{
+      display:none;
+      margin:2px 0 28px;
+    }
+
+    .repos-mode .repo-section{
+      display:block;
+    }
+
+    .repo-status{
+      min-height:76px;
+      display:grid;
+      place-items:center;
+      color:rgba(255,255,255,.42);
+      font-size:10px;
+      letter-spacing:.13em;
+      text-transform:uppercase;
+      border:1px dashed rgba(255,255,255,.1);
+      border-radius:18px;
+    }
+
+    .repo-grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+    }
+
+    .repo-card{
+      min-width:0;
+      padding:16px;
+      border:1px solid rgba(255,255,255,.1);
+      border-radius:18px;
+      background:
+        linear-gradient(145deg,rgba(255,255,255,.06),rgba(255,255,255,.018));
+      color:#fff;
+      text-decoration:none;
+      transition:
+        transform .22s,
+        border-color .22s,
+        background .22s;
+    }
+
+    .repo-card:hover,
+    .repo-card:focus-visible{
+      transform:translateY(-3px);
+      border-color:rgba(255,255,255,.22);
+      background:
+        linear-gradient(145deg,rgba(255,255,255,.1),rgba(255,255,255,.024));
+      outline:none;
+    }
+
+    .repo-top{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:10px;
+    }
+
+    .repo-name{
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      font-size:16px;
+      font-weight:710;
+      letter-spacing:-.035em;
+    }
+
+    .repo-arrow{
+      flex:none;
+      color:rgba(255,255,255,.52);
+    }
+
+    .repo-description{
+      min-height:40px;
+      margin:0 0 14px;
+      color:rgba(255,255,255,.5);
+      font-size:11px;
+      line-height:1.48;
+      display:-webkit-box;
+      -webkit-line-clamp:2;
+      -webkit-box-orient:vertical;
+      overflow:hidden;
+    }
+
+    .repo-meta{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      color:rgba(255,255,255,.38);
+      font-size:9px;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+
+    .panel-actions{
+      margin-top:auto;
+      display:grid;
+      gap:10px;
+    }
+
+    .primary-button,.secondary-button{
+      height:52px;
+      padding:0 18px;
+      border-radius:16px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      border:0;
+      cursor:pointer;
+      text-decoration:none;
+      font-size:13px;
+      font-weight:680;
+    }
+
+    .primary-button{
+      color:var(--ink);
+      background:var(--paper);
+    }
+
+    .secondary-button{
+      justify-content:center;
+      color:rgba(255,255,255,.68);
+      background:rgba(255,255,255,.032);
+      border:1px solid rgba(255,255,255,.09);
+    }
+
+    .toast{
+      position:fixed;
+      z-index:60;
+      left:50%;
+      bottom:calc(var(--safe-bottom) + 14px);
+      transform:translate(-50%,20px);
+      opacity:0;
+      pointer-events:none;
+      padding:11px 15px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(15,15,15,.74);
+      backdrop-filter:blur(22px);
+      color:rgba(255,255,255,.74);
+      font-size:10px;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      transition:.35s ease;
+    }
+
+    .toast.show{
+      opacity:1;
+      transform:translate(-50%,0);
+    }
+
+    @media(max-width:900px){
+      .scene{
+        align-items:start;
+        padding-top:calc(var(--safe-top) + 16px);
+      }
+
+      .card-shell{
+        width:100%;
+        min-height:auto;
+      }
+
+      .card{
+        min-height:auto;
+        padding:clamp(22px,5vw,34px);
+        grid-template-columns:1fr;
+        gap:42px;
+        transform:none !important;
+      }
+
+      .refracted-pattern{
+        opacity:.28;
+        filter:url(#liquid-distortion) blur(18px) contrast(1.12);
+      }
+
+      .topline{
+        margin-bottom:55px;
+      }
+
+      .identity{
+        margin-bottom:48px;
+      }
+
+      .name-line{
+        font-size:clamp(48px,16vw,84px);
+        letter-spacing:-.09em;
+        white-space:normal;
+      }
+
+      .surname-line{
+        font-size:clamp(34px,11vw,60px);
+        white-space:normal;
+      }
+
+      .role{
+        margin-top:22px;
+      }
+
+      .card-side{
+        padding-left:0;
+        padding-top:32px;
+        border-left:0;
+        border-top:1px solid rgba(255,255,255,.11);
+      }
+
+      .link-item{
+        min-height:64px;
+      }
+
+      .link-name{
+        font-size:clamp(21px,7vw,31px);
+      }
+
+      .orb{
+        width:58px;
+        height:58px;
+        left:82%;
+        top:16%;
+        opacity:.72;
+      }
+
+      .detail-panel,
+      .detail-panel.repos-mode{
+        top:auto;
+        left:8px;
+        right:8px;
+        bottom:max(8px,env(safe-area-inset-bottom));
+        width:auto;
+        max-height:min(76vh,680px);
+        transform:translateY(calc(100% + 40px));
+        border-radius:24px;
+      }
+
+      .detail-panel.open{
+        transform:translateY(0);
+      }
+
+      .panel-inner{
+        padding:22px;
+      }
+
+      .panel-index{
+        margin-bottom:36px;
+      }
+
+      .panel-title{
+        font-size:clamp(36px,11vw,48px);
+      }
+    }
+
+    @media(max-width:600px){
+      .scene{
+        padding-left:8px;
+        padding-right:8px;
+      }
+
+      .card{
+        border-radius:24px;
+      }
+
+      .topline{
+        align-items:flex-start;
+      }
+
+      .micro{
+        line-height:1.45;
+      }
+
+      .footer-row{
+        align-items:flex-start;
+        flex-direction:column;
+      }
+
+      .scrolling-code{
+        width:100%;
+        max-width:none;
+      }
+
+      .repo-grid{
+        grid-template-columns:1fr;
+      }
+    }
+
+    @media(prefers-reduced-motion:reduce){
+      *,*::before,*::after{
+        animation-duration:.001ms !important;
+        animation-iteration-count:1 !important;
+      }
+
+      .card{
+        transform:none !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Il filtro SVG genera la distorsione del pattern dentro il vetro. -->
+  <svg width="0" height="0" aria-hidden="true" focusable="false">
+    <filter id="liquid-distortion" x="-30%" y="-30%" width="160%" height="160%">
+      <feTurbulence
+        type="fractalNoise"
+        baseFrequency="0.009 0.014"
+        numOctaves="2"
+        seed="8"
+        result="noise">
+        <animate
+          attributeName="baseFrequency"
+          dur="18s"
+          values="0.009 0.014;0.014 0.009;0.009 0.014"
+          repeatCount="indefinite" />
+      </feTurbulence>
+
+      <feGaussianBlur in="noise" stdDeviation="1.1" result="smoothNoise" />
+
+      <feDisplacementMap
+        in="SourceGraphic"
+        in2="smoothNoise"
+        scale="34"
+        xChannelSelector="R"
+        yChannelSelector="B" />
+    </filter>
+  </svg>
+
+  <main class="scene">
+    <div class="background" aria-hidden="true">
+      <div class="pattern a"></div>
+      <div class="pattern b"></div>
+      <div class="pattern c"></div>
+    </div>
+
+    <div class="pointer-glow" aria-hidden="true"></div>
+
+    <section class="card-shell" aria-label="Biglietto da visita digitale">
+      <article class="card" id="card">
+        <div class="refracted-pattern" aria-hidden="true"></div>
+        <div class="glass-specular" aria-hidden="true"></div>
+        <div class="glass-edge" aria-hidden="true"></div>
+        <div class="orb" aria-hidden="true"></div>
+
+        <div class="card-main">
+          <div>
+            <div class="topline">
+              <div class="micro" id="topLabel">Digital identity / 2026</div>
+
+              <div class="micro availability">
+                <span class="availability-dot"></span>
+                <span id="availabilityText">Available for ideas</span>
+              </div>
+            </div>
+
+            <div class="identity">
+              <span class="name-line" id="nameLine" data-ghost="DANIELE">DANIELE</span>
+
+              <span class="surname-line" id="surnameLine" data-ghost="MASTRORILLI">
+                MASTRO<span class="tight">RILLI</span>
+              </span>
+
+              <p class="role" id="roleText">
+                Marketing specialist, visual thinker and builder of digital experiences.
+              </p>
+            </div>
+          </div>
+
+          <div class="footer-row">
+            <span id="locationText">Puglia · Italy</span>
+
+            <div class="scrolling-code" aria-hidden="true">
+              <span id="marqueeText">DESIGN — CODE — MOTION — INTERACTION — DESIGN — CODE — MOTION — INTERACTION —</span>
+            </div>
+          </div>
+        </div>
+
+        <aside class="card-side">
+          <div>
+            <div class="side-heading" id="linksHeading">Selected links</div>
+            <nav class="link-list" id="linkList" aria-label="Link personali"></nav>
+          </div>
+
+          <div class="side-meta">
+            <span id="localTime">00:00</span>
+            <span id="editionText">Edition 02</span>
+          </div>
+        </aside>
+      </article>
+    </section>
+
+    <aside class="detail-panel" id="detailPanel" aria-hidden="true">
+      <div class="panel-inner">
+        <button class="panel-close" id="panelClose" aria-label="Chiudi">×</button>
+
+        <div class="panel-index" id="panelIndex">01 / 04</div>
+        <div class="panel-eyebrow" id="panelEyebrow">Digital destination</div>
+        <h2 class="panel-title" id="panelTitle">Instagram</h2>
+        <p class="panel-description" id="panelDescription"></p>
+        <div class="tags" id="panelTags"></div>
+
+        <section class="repo-section" id="repoSection" aria-label="Repository GitHub">
+          <div class="repo-status" id="repoStatus">Caricamento repository</div>
+          <div class="repo-grid" id="repoGrid" hidden></div>
+        </section>
+
+        <div class="panel-actions">
+          <a class="primary-button" id="panelLink" href="#" target="_blank" rel="noopener">
+            <span id="openLabel">Apri</span>
+            <span>↗</span>
+          </a>
+
+          <button class="secondary-button" id="copyButton">Copia link</button>
+        </div>
+      </div>
+    </aside>
+
+    <div class="toast" id="toast">Link copiato</div>
+  </main>
+
+  <div class="grain"></div>
+  <div class="vignette"></div>
+
+  <script>
+  (() => {
+    "use strict";
+
+    /* ==========================================================
+       CONFIGURAZIONE
+       ========================================================== */
+    const CONFIG = {
+      githubUsername: "danwhs",
+
+      appearance: {
+        background: "#080808",
+        cardBackground: "rgba(15,15,15,.48)",
+        panelBackground: "rgba(14,14,14,.68)",
+        refractionStrength: 34
+      },
+
+      sizes: {
+        cardWidth: 1120,
+        cardMinHeight: 620,
+        cardRadius: 36,
+        cardPadding: 42,
+
+        panelWidth: 410,
+        reposPanelWidth: 610,
+        panelRadius: 28,
+
+        nameSize: 132,
+        surnameSize: 92,
+        roleSize: 13,
+        linkSize: 30,
+        bodySize: 14,
+        microSize: 10
+      },
+
+      text: {
+        topLabel: "Digital identity / 2026",
+        availability: "Available for ideas",
+        name: "DANIELE",
+        surname: "MASTRORILLI",
+        surnameTightFrom: 6,
+        role: "Marketing specialist, visual thinker and builder of digital experiences.",
+        location: "Puglia · Italy",
+        linksHeading: "Selected links",
+        edition: "Edition 02",
+        panelEyebrow: "Digital destination",
+        openLabel: "Apri",
+        copyLabel: "Copia link",
+        copiedLabel: "Link copiato",
+        loadingRepos: "Caricamento repository",
+        reposError: "Repository non disponibili",
+        marquee: "DESIGN — CODE — MOTION — INTERACTION — DESIGN — CODE — MOTION — INTERACTION —"
+      },
+
+      links: [
+        {
+          name: "Instagram",
+          handle: "@_daniele.mastrorilli_",
+          url: "https://www.instagram.com/_daniele.mastrorilli_/",
+          description: "Frammenti personali, immagini, idee e momenti raccolti in un unico spazio visivo.",
+          tags: ["Social","Visual","Direct"]
+        },
+        {
+          name: "GitHub",
+          handle: "@danwhs",
+          url: "https://github.com/danwhs",
+          description: "Codice, esperimenti e prototipi pubblicati nel mio profilo GitHub.",
+          tags: ["Code","Open source","danwhs"]
+        },
+        {
+          name: "Projects",
+          handle: "GitHub repositories",
+          url: "https://github.com/danwhs?tab=repositories",
+          description: "Gli ultimi repository pubblici vengono caricati direttamente da GitHub.",
+          tags: ["Repositories","Live data","Projects"],
+          type: "repos"
+        },
+        {
+          name: "Contact",
+          handle: "Email",
+          url: "mailto:danielemastrorilli@aol.com",
+          description: "Per collaborazioni, proposte o semplicemente una buona idea da costruire insieme.",
+          tags: ["Email","Work","Available"]
+        }
+      ]
+    };
+
+    const root = document.documentElement.style;
+
+    root.setProperty("--bg",CONFIG.appearance.background);
+    root.setProperty("--card-width",`${CONFIG.sizes.cardWidth}px`);
+    root.setProperty("--card-min-height",`${CONFIG.sizes.cardMinHeight}px`);
+    root.setProperty("--card-radius",`${CONFIG.sizes.cardRadius}px`);
+    root.setProperty("--card-padding",`${CONFIG.sizes.cardPadding}px`);
+    root.setProperty("--panel-width",`${CONFIG.sizes.panelWidth}px`);
+    root.setProperty("--panel-repos-width",`${CONFIG.sizes.reposPanelWidth}px`);
+    root.setProperty("--panel-radius",`${CONFIG.sizes.panelRadius}px`);
+
+    root.setProperty("--name-size",`clamp(56px,8.2vw,${CONFIG.sizes.nameSize}px)`);
+    root.setProperty("--surname-size",`clamp(42px,6vw,${CONFIG.sizes.surnameSize}px)`);
+    root.setProperty("--role-size",`${CONFIG.sizes.roleSize}px`);
+    root.setProperty("--link-size",`clamp(19px,2.1vw,${CONFIG.sizes.linkSize}px)`);
+    root.setProperty("--body-size",`${CONFIG.sizes.bodySize}px`);
+    root.setProperty("--micro-size",`${CONFIG.sizes.microSize}px`);
+
+    const displacement = document.querySelector("#liquid-distortion feDisplacementMap");
+    if(displacement){
+      displacement.setAttribute("scale",String(CONFIG.appearance.refractionStrength));
+    }
+
+    const $ = selector => document.querySelector(selector);
+
+    const card = $("#card");
+    const linkList = $("#linkList");
+    const panel = $("#detailPanel");
+    const panelClose = $("#panelClose");
+    const panelIndex = $("#panelIndex");
+    const panelTitle = $("#panelTitle");
+    const panelDescription = $("#panelDescription");
+    const panelTags = $("#panelTags");
+    const panelLink = $("#panelLink");
+    const copyButton = $("#copyButton");
+    const toast = $("#toast");
+    const localTime = $("#localTime");
+    const repoSection = $("#repoSection");
+    const repoStatus = $("#repoStatus");
+    const repoGrid = $("#repoGrid");
+
+    $("#topLabel").textContent = CONFIG.text.topLabel;
+    $("#availabilityText").textContent = CONFIG.text.availability;
+    $("#nameLine").textContent = CONFIG.text.name;
+    $("#nameLine").dataset.ghost = CONFIG.text.name;
+    $("#roleText").textContent = CONFIG.text.role;
+    $("#locationText").textContent = CONFIG.text.location;
+    $("#linksHeading").textContent = CONFIG.text.linksHeading;
+    $("#editionText").textContent = CONFIG.text.edition;
+    $("#marqueeText").textContent = CONFIG.text.marquee;
+    $("#panelEyebrow").textContent = CONFIG.text.panelEyebrow;
+    $("#openLabel").textContent = CONFIG.text.openLabel;
+    copyButton.textContent = CONFIG.text.copyLabel;
+    toast.textContent = CONFIG.text.copiedLabel;
+
+    const cut = Math.max(
+      0,
+      Math.min(CONFIG.text.surname.length,CONFIG.text.surnameTightFrom)
+    );
+
+    $("#surnameLine").innerHTML =
+      CONFIG.text.surname.slice(0,cut)
+      +`<span class="tight">${CONFIG.text.surname.slice(cut)}</span>`;
+
+    $("#surnameLine").dataset.ghost = CONFIG.text.surname;
+
+    let selectedIndex = null;
+    let reposLoaded = false;
+
+    function createLinks(){
+      linkList.innerHTML = "";
+
+      CONFIG.links.forEach((item,index)=>{
+        const button = document.createElement("button");
+        button.className = "link-item";
+        button.type = "button";
+
+        button.innerHTML = `
+          <span class="link-copy">
+            <span class="link-name">${item.name}</span>
+            <span class="link-handle">${item.handle || ""}</span>
+          </span>
+          <span class="link-arrow">↗</span>
+        `;
+
+        button.addEventListener("click",()=>openPanel(index));
+        linkList.appendChild(button);
+      });
+    }
+
+    async function loadRepositories(){
+      if(reposLoaded)return;
+
+      repoStatus.hidden = false;
+      repoGrid.hidden = true;
+      repoStatus.textContent = CONFIG.text.loadingRepos;
+
+      try{
+        const response = await fetch(
+          `https://api.github.com/users/${encodeURIComponent(CONFIG.githubUsername)}/repos?sort=updated&direction=desc&per_page=8`,
+          {
+            headers:{
+              "Accept":"application/vnd.github+json"
+            }
+          }
+        );
+
+        if(!response.ok){
+          throw new Error(`GitHub API ${response.status}`);
+        }
+
+        const data = await response.json();
+        const repos = data
+          .filter(repo=>!repo.fork)
+          .slice(0,6);
+
+        if(!repos.length){
+          throw new Error("No public repositories");
+        }
+
+        repoGrid.innerHTML = repos.map(repo=>{
+          const description = repo.description || "Repository pubblico su GitHub.";
+          const language = repo.language || "Code";
+          const stars = Number(repo.stargazers_count || 0);
+
+          return `
+            <a
+              class="repo-card"
+              href="${repo.html_url}"
+              target="_blank"
+              rel="noopener"
+              aria-label="Apri ${repo.name} su GitHub">
+              <div class="repo-top">
+                <span class="repo-name">${repo.name}</span>
+                <span class="repo-arrow">↗</span>
+              </div>
+
+              <p class="repo-description">${description}</p>
+
+              <div class="repo-meta">
+                <span>${language}</span>
+                <span>★ ${stars}</span>
+              </div>
+            </a>
+          `;
+        }).join("");
+
+        repoStatus.hidden = true;
+        repoGrid.hidden = false;
+        reposLoaded = true;
+      }catch(error){
+        repoGrid.hidden = true;
+        repoStatus.hidden = false;
+        repoStatus.innerHTML = `
+          <span>
+            ${CONFIG.text.reposError}<br><br>
+            <a
+              href="https://github.com/${CONFIG.githubUsername}?tab=repositories"
+              target="_blank"
+              rel="noopener"
+              style="color:white">
+              Apri GitHub ↗
+            </a>
+          </span>
+        `;
+      }
+    }
+
+    function openPanel(index){
+      selectedIndex = index;
+      const item = CONFIG.links[index];
+      const isRepos = item.type === "repos";
+
+      [...linkList.children].forEach((element,i)=>{
+        element.classList.toggle("active",i===index);
+      });
+
+      panel.classList.toggle("repos-mode",isRepos);
+
+      panelIndex.textContent =
+        String(index+1).padStart(2,"0")
+        +" / "
+        +String(CONFIG.links.length).padStart(2,"0");
+
+      panelTitle.textContent = item.name;
+      panelDescription.textContent = item.description;
+      panelLink.href = item.url;
+      panelTags.innerHTML = item.tags
+        .map(tag=>`<span class="tag">${tag}</span>`)
+        .join("");
+
+      repoSection.setAttribute("aria-hidden",String(!isRepos));
+
+      if(isRepos){
+        loadRepositories();
+      }
+
+      panel.classList.add("open");
+      panel.setAttribute("aria-hidden","false");
+
+      if(navigator.vibrate)navigator.vibrate(8);
+    }
+
+    function closePanel(){
+      panel.classList.remove("open");
+      panel.setAttribute("aria-hidden","true");
+
+      [...linkList.children].forEach(element=>{
+        element.classList.remove("active");
+      });
+
+      selectedIndex = null;
+
+      setTimeout(()=>{
+        panel.classList.remove("repos-mode");
+      },450);
+    }
+
+    function showToast(){
+      toast.classList.add("show");
+      clearTimeout(showToast.timer);
+
+      showToast.timer = setTimeout(()=>{
+        toast.classList.remove("show");
+      },1500);
+    }
+
+    async function copyCurrentLink(){
+      if(selectedIndex===null)return;
+
+      const value = CONFIG.links[selectedIndex].url;
+
+      try{
+        await navigator.clipboard.writeText(value);
+        showToast();
+      }catch{
+        const textarea = document.createElement("textarea");
+        textarea.value = value;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        textarea.remove();
+        showToast();
+      }
+    }
+
+    panelClose.addEventListener("click",closePanel);
+    copyButton.addEventListener("click",copyCurrentLink);
+
+    document.addEventListener("keydown",event=>{
+      if(event.key==="Escape")closePanel();
+    });
+
+    document.addEventListener("pointermove",event=>{
+      root.setProperty("--pointer-x",`${event.clientX}px`);
+      root.setProperty("--pointer-y",`${event.clientY}px`);
+
+      const rect = card.getBoundingClientRect();
+      const x = (event.clientX-rect.left)/rect.width;
+      const y = (event.clientY-rect.top)/rect.height;
+
+      const safeX = Math.max(0,Math.min(1,x));
+      const safeY = Math.max(0,Math.min(1,y));
+
+      root.setProperty("--mx",`${safeX*100}%`);
+      root.setProperty("--my",`${safeY*100}%`);
+      root.setProperty("--glass-x",`${(safeX-.5)*18}px`);
+      root.setProperty("--glass-y",`${(safeY-.5)*14}px`);
+
+      root.setProperty("--orb-x",`${Math.max(12,Math.min(88,safeX*100))}%`);
+      root.setProperty("--orb-y",`${Math.max(10,Math.min(90,safeY*100))}%`);
+
+      if(matchMedia("(pointer:fine)").matches && innerWidth>900){
+        card.style.setProperty("--rx",`${(safeY-.5)*-2.2}deg`);
+        card.style.setProperty("--ry",`${(safeX-.5)*3.2}deg`);
+      }
+    });
+
+    card.addEventListener("pointerleave",()=>{
+      card.style.setProperty("--rx","0deg");
+      card.style.setProperty("--ry","0deg");
+    });
+
+    function updateTime(){
+      localTime.textContent = new Intl.DateTimeFormat("it-IT",{
+        hour:"2-digit",
+        minute:"2-digit"
+      }).format(new Date());
+    }
+
+    createLinks();
+    updateTime();
+    setInterval(updateTime,30000);
+  })();
+  </script>
+</body>
+</html>
